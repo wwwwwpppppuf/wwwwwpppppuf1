@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>飛輪 · 8級齒輪</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#070a10}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+    color:#e8eefc;-webkit-font-smoothing:antialiased;
+  }
+  #scene{position:fixed;inset:0;display:block;z-index:0}
+
+  .hud-left{
+    position:fixed;left:16px;top:calc(env(safe-area-inset-top,0px) + 14px);
+    z-index:10;pointer-events:none;
+  }
+  .rpm-line{display:flex;align-items:baseline;gap:4px}
+  .rpm{
+    font-size:30px;font-weight:200;letter-spacing:-1px;line-height:1;
+    font-variant-numeric:tabular-nums;
+    text-shadow:0 0 20px rgba(56,232,255,.4);
+  }
+  .rpm-unit{font-size:9px;letter-spacing:1.5px;color:#6b7a99;font-weight:600}
+  .hud-sub{font-size:10px;color:#55627c;margin-top:3px;letter-spacing:.4px}
+  .hud-sub b{color:#8fa2c4;font-weight:600}
+
+  .clock{
+    position:fixed;right:16px;top:calc(env(safe-area-inset-top,0px) + 14px);
+    z-index:10;text-align:right;pointer-events:none;
+  }
+  .clock-date{font-size:10px;color:#5d6a84;letter-spacing:.5px;margin-bottom:3px}
+  .clock-time{
+    font-size:20px;font-weight:300;letter-spacing:.5px;
+    font-variant-numeric:tabular-nums;color:#c8d6ee;
+    text-shadow:0 0 16px rgba(56,232,255,.2);
+  }
+
+  /* ---------- 右上角按鈕組 ---------- */
+  .top-actions{
+    position:fixed;right:16px;top:calc(env(safe-area-inset-top,0px) + 64px);
+    z-index:11;display:flex;gap:6px;
+  }
+  .mini-btn{
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.09);
+    color:#7f8ea8;font-size:10px;font-weight:700;letter-spacing:.5px;
+    padding:5px 10px;border-radius:99px;cursor:pointer;font-family:inherit;
+    transition:.15s;white-space:nowrap;
+  }
+  .mini-btn:hover{background:rgba(255,255,255,.1);color:#c8d6ee}
+  .mini-btn.backup{color:#38e8ff;border-color:rgba(56,232,255,.3)}
+  .mini-btn.backup:hover{background:rgba(56,232,255,.12)}
+  .mini-btn.backup:disabled{opacity:.5;cursor:default}
+
+  .composer{
+    position:fixed;left:0;right:0;bottom:0;z-index:10;
+    padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 14px);
+    display:flex;gap:8px;
+    background:linear-gradient(to top,rgba(7,10,16,.96) 30%,rgba(7,10,16,0));
+  }
+  .composer input{
+    flex:1;min-width:0;
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:13px;padding:13px 15px;
+    color:#e8eefc;font-size:15px;font-family:inherit;outline:none;
+    transition:.2s;
+  }
+  .composer input::placeholder{color:#4d5a72}
+  .composer input:focus{
+    border-color:rgba(56,232,255,.45);
+    background:rgba(56,232,255,.05);
+    box-shadow:0 0 0 3px rgba(56,232,255,.08);
+  }
+  .composer button{
+    background:linear-gradient(135deg,#2bb8ff,#38e8ff);
+    border:0;border-radius:13px;padding:0 18px;
+    color:#04121a;font-weight:800;font-size:13.5px;letter-spacing:.5px;
+    font-family:inherit;cursor:pointer;
+    box-shadow:0 6px 22px rgba(56,232,255,.26);
+    transition:.15s;
+  }
+  .composer button:active{transform:scale(.96)}
+
+  .verdict{
+    position:fixed;left:12px;right:12px;
+    bottom:calc(env(safe-area-inset-bottom,0px) + 76px);
+    z-index:12;
+    background:rgba(14,19,30,.95);
+    backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:15px;padding:11px 12px;
+    display:none;
+    box-shadow:0 18px 50px rgba(0,0,0,.6);
+    animation:pop .25s cubic-bezier(.2,1.3,.5,1);
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+  .v-top{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+  .v-lv{
+    font-size:10.5px;font-weight:800;letter-spacing:.5px;
+    padding:2px 7px;border-radius:5px;color:#04121a;
+  }
+  .v-name{font-size:11.5px;color:#8fa2c4;font-weight:600}
+  .v-tag{font-size:10px;color:#38e8ff;margin-left:auto;font-weight:600}
+  .v-text{font-size:12.5px;color:#c8d6ee;margin-bottom:4px;line-height:1.35}
+  .v-note{font-size:10.5px;color:#4d5a72;margin-bottom:9px}
+  .v-note b{color:#38e8ff;font-weight:600}
+  .v-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+  .v-actions button{
+    background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.08);
+    color:#7f8ea8;font-size:11px;font-weight:700;font-family:inherit;
+    padding:7px 0;border-radius:8px;cursor:pointer;transition:.15s;
+  }
+  .v-actions button:hover{background:rgba(255,255,255,.1)}
+  .v-actions button.on{
+    background:rgba(56,232,255,.14);
+    border-color:rgba(56,232,255,.5);
+  }
+
+  .empty{
+    position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 92px);
+    z-index:9;text-align:center;font-size:12px;color:#4d5a72;
+    pointer-events:none;transition:opacity .4s;
+  }
+  .empty.hide{opacity:0}
+
+  .toast{
+    position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 106px);
+    transform:translate(-50%,-8px);
+    z-index:30;font-size:11.5px;color:#c8d6ee;
+    background:rgba(20,26,38,.95);
+    border:1px solid rgba(56,232,255,.3);
+    padding:7px 14px;border-radius:99px;
+    pointer-events:none;opacity:0;transition:opacity .35s, transform .35s;
+    white-space:nowrap;
+    box-shadow:0 8px 30px rgba(0,0,0,.5);
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  .backdrop{
+    position:fixed;inset:0;z-index:19;
+    background:rgba(0,0,0,.5);
+    opacity:0;pointer-events:none;transition:opacity .28s;
+  }
+  .backdrop.open{opacity:1;pointer-events:auto}
+
+  .sheet{
+    position:fixed;left:0;right:0;bottom:0;z-index:20;
+    background:rgba(13,18,28,.985);
+    backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+    border-top:1px solid rgba(255,255,255,.1);
+    border-radius:20px 20px 0 0;
+    transform:translateY(105%);
+    transition:transform .32s cubic-bezier(.2,.9,.3,1);
+    display:flex;flex-direction:column;
+    max-height:60vh;
+    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
+    box-shadow:0 -20px 60px rgba(0,0,0,.7);
+  }
+  .sheet.open{transform:translateY(0)}
+
+  .sheet-head{
+    display:flex;align-items:center;gap:8px;
+    padding:14px 16px 10px;
+    border-bottom:1px solid rgba(255,255,255,.06);
+    flex:0 0 auto;
+  }
+  .sheet-lv{
+    font-size:12px;font-weight:800;letter-spacing:.5px;
+    padding:3px 9px;border-radius:6px;color:#04121a;
+  }
+  .sheet-name{font-size:13px;color:#c8d6ee;font-weight:700}
+  .sheet-meta{font-size:10.5px;color:#5d6a84;margin-left:2px}
+  .sheet-close{
+    margin-left:auto;background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.08);
+    color:#8fa2c4;width:28px;height:28px;border-radius:8px;
+    cursor:pointer;font-size:13px;font-family:inherit;
+    display:flex;align-items:center;justify-content:center;
+    transition:.15s;
+  }
+  .sheet-close:hover{background:rgba(255,255,255,.12);color:#e8eefc}
+
+  .sheet-list{
+    flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:8px 12px;
+    min-height:60px;
+  }
+  .ev-item{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 10px;border-radius:10px;
+    transition:background .15s, opacity .2s, transform .2s;
+  }
+  .ev-item:hover{background:rgba(255,255,255,.035)}
+  .ev-item.removing{
+    opacity:0;
+    transform:translateX(16px);
+    pointer-events:none;
+  }
+  .ev-text{
+    flex:1;font-size:13.5px;color:#d4dff2;line-height:1.35;
+    word-break:break-word;
+  }
+  .ev-time{
+    font-size:10.5px;color:#4d5a72;white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+    flex:0 0 auto;
+  }
+  .ev-del{
+    background:none;
+    border:none;
+    border-left:1px solid rgba(255,255,255,.06);
+    color:#5d6a84;
+    font-size:15px;
+    line-height:1;
+    cursor:pointer;
+    padding:2px 4px 2px 12px;
+    margin-left:2px;
+    opacity:0.55;
+    transition:opacity .15s, color .15s;
+    font-family:inherit;
+    flex:0 0 auto;
+  }
+  .ev-del:hover,.ev-del:active{opacity:1;color:#ff5b5b}
+
+  .ev-empty{
+    text-align:center;font-size:12px;color:#4d5a72;
+    padding:24px 0;
+  }
+
+  .sheet-add{
+    flex:0 0 auto;display:flex;gap:7px;
+    padding:10px 12px 4px;
+    border-top:1px solid rgba(255,255,255,.06);
+  }
+  .sheet-add input{
+    flex:1;min-width:0;
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:11px;padding:11px 13px;
+    color:#e8eefc;font-size:14px;font-family:inherit;outline:none;
+    transition:.2s;
+  }
+  .sheet-add input::placeholder{color:#4d5a72}
+  .sheet-add input:focus{
+    border-color:rgba(56,232,255,.45);
+    background:rgba(56,232,255,.05);
+  }
+  .sheet-add button{
+    background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:11px;padding:0 15px;
+    color:#c8d6ee;font-weight:700;font-size:12.5px;font-family:inherit;
+    cursor:pointer;transition:.15s;
+  }
+  .sheet-add button:hover{background:rgba(56,232,255,.16);border-color:rgba(56,232,255,.4);color:#38e8ff}
+  .sheet-add button:active{transform:scale(.96)}
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<div class="hud-left">
+  <div class="rpm-line">
+    <div class="rpm" id="rpmVal">0</div>
+    <div class="rpm-unit">RPM</div>
+  </div>
+  <div class="hud-sub">L1 今日 <b id="todayCount">0</b> 件</div>
+</div>
+
+<div class="clock">
+  <div class="clock-date" id="clockDate">—</div>
+  <div class="clock-time" id="clockTime">--:--:--</div>
+</div>
+
+<div class="top-actions">
+  <button class="mini-btn backup" id="backupBtn">備份</button>
+  <button class="mini-btn" id="tsBtn">×1</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="empty" id="empty">寫一件事，L1 齒輪就開始轉 ⚙️</div>
+
+<div class="verdict" id="verdict">
+  <div class="v-top">
+    <span class="v-lv" id="vLv">L5</span>
+    <span class="v-name" id="vName">動能</span>
+    <span class="v-tag" id="vTag"></span>
+  </div>
+  <div class="v-text" id="vText"></div>
+  <div class="v-note" id="vNote"></div>
+  <div class="v-actions" id="vActions"></div>
+</div>
+
+<div class="composer">
+  <input id="textInput" placeholder="今天推進了什麼？" autocomplete="off" enterkeyhint="send">
+  <button id="goBtn">加動力</button>
+</div>
+
+<div class="backdrop" id="backdrop"></div>
+
+<div class="sheet" id="sheet">
+  <div class="sheet-head">
+    <span class="sheet-lv" id="sheetLv">L3</span>
+    <span class="sheet-name" id="sheetName">推進</span>
+    <span class="sheet-meta" id="sheetMeta"></span>
+    <button class="sheet-close" id="sheetClose">✕</button>
+  </div>
+  <div class="sheet-list" id="sheetList"></div>
+  <div class="sheet-add">
+    <input id="sheetInput" placeholder="加一件這個等級的事…" autocomplete="off" enterkeyhint="send">
+    <button id="sheetAddBtn">加入</button>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================================================================
+   1. 常數
+   ================================================================ */
+const N_GEARS = 8;
+const RATIO   = 10;
+const KEY     = 'flywheel.v4';
+const LEARN_KEY = 'flywheel.learn.v2';
+
+const L1_KEEP_DAYS = 3;
+const L1_KEEP_MS   = L1_KEEP_DAYS * 86400_000;
+
+const LEVEL_COLORS = [
+  '#5b8cff', '#4fa3ff', '#38e8ff', '#2fe0c8',
+  '#7ee06a', '#ffd23f', '#ff9f38', '#ff5b5b'
+];
+const LEVEL_NAMES = [
+  '微光', '起步', '推進', '加速',
+  '動能', '突破', '里程碑', '傳奇'
+];
+
+/* ================================================================
+   2. 狀態
+   ================================================================ */
+const S = {
+  units: new Array(N_GEARS).fill(0),
+  sent:  new Array(N_GEARS).fill(0),
+  angles:new Array(N_GEARS).fill(0),
+  events: [],
+  dayKey: '',
+};
+
+const smoothOmega = new Array(N_GEARS).fill(0);
+const deletingIds = new Set();
+
+const pops = [];
+let currentVerdict = null;
+let verdictTimer = null;
+let sheetOpen = false;
+let sheetLevel = 3;
+let learned = new Map();
+let learnSaveTimer = null;
+let toastTimer = null;
+let lastToastAt = 0;
+
+/* ================================================================
+   3. 學習
+   ================================================================ */
+function normalize(s) {
+  return String(s).toLowerCase()
+    .replace(/[\s,，.。!！?？、;；:："'“”‘’()（）\[\]【】{}<>《》\-_/\\|~`@#$%^&*+=]/g, '');
+}
+function addPhrase(p, lv, w) {
+  if (p.length < 2) return;
+  let d = learned.get(p);
+  if (!d) { d = {}; learned.set(p, d); }
+  d[lv] = (d[lv] || 0) + w;
+}
+function learn(text, level) {
+  const t = normalize(text);
+  if (t.length < 2) return;
+  addPhrase(t, level, 3);
+  const maxLen = Math.min(6, t.length);
+  for (let len = 2; len <= maxLen; len++) {
+    for (let i = 0; i + len <= t.length; i++) addPhrase(t.slice(i, i + len), level, 1);
+  }
+  scheduleSaveLearned();
+}
+function scheduleSaveLearned() {
+  if (learnSaveTimer) return;
+  learnSaveTimer = setTimeout(() => { learnSaveTimer = null; saveLearned(); }, 400);
+}
+function saveLearned() {
+  try {
+    const out = {};
+    for (const [p, d] of learned) {
+      let tot = 0; for (const k in d) tot += d[k];
+      if (tot >= 2) out[p] = d;
+    }
+    localStorage.setItem(LEARN_KEY, JSON.stringify(out));
+  } catch (e) {}
+}
+function loadLearned() {
+  try {
+    const raw = localStorage.getItem(LEARN_KEY);
+    if (raw) learned = new Map(Object.entries(JSON.parse(raw)));
+  } catch (e) { learned = new Map(); }
+}
+
+/* ================================================================
+   4. 自動分級
+   ================================================================ */
+const KEYWORDS = [
+  { w: 8, kw: ['發布','发布','上線','上线','簽約','签约','融資','融资','里程碑','上市',
+               '首單','首单','爆紅','爆红','十萬','十万','傳奇','传奇'] },
+  { w: 7, kw: ['完成專案','完成项目','交付','推出','上架','成交','獲客','获客',
+               '突破','簽下','签下','大單','大单'] },
+  { w: 6, kw: ['寫完','写完','做完','運動','运动','健身','深度工作','專注','专注',
+               '會議','会议','提案','拜訪','拜访','跑步','游泳','騎車','骑车'] },
+  { w: 5, kw: ['學習','学习','練習','练习','設計','设计','開發','开发','報告','报告',
+               '復盤','复盘','寫','写','讀完','读完'] },
+  { w: 4, kw: ['整理','回信','回復','回复','閱讀','阅读','規劃','规划','記錄','记录',
+               '排程','收尾','覆核','复核'] },
+  { w: 3, kw: ['散步','伸展','冥想','喝水','打掃','打扫','看了一眼','想了想'] },
+  { w: 2, kw: ['打開','打开','瀏覽','浏览','滑手機','滑手机','發呆','发呆'] },
+];
+
+function classify(text) {
+  const t = normalize(text);
+  let bestPhrase = '', bestLevel = 0;
+  for (const [phrase, counts] of learned) {
+    if (phrase.length <= bestPhrase.length) continue;
+    if (!t.includes(phrase)) continue;
+    let lv = 1, max = 0;
+    for (const k in counts) if (counts[k] > max) { max = counts[k]; lv = +k; }
+    bestPhrase = phrase; bestLevel = lv;
+  }
+  if (bestPhrase) return { level: bestLevel, reason: 'learned' };
+
+  let score = 1;
+  for (const { w, kw } of KEYWORDS) {
+    for (const k of kw) if (t.includes(k)) { score = Math.max(score, w); break; }
+  }
+  if (t.length > 15) score += 0.4;
+  if (t.length > 30) score += 0.4;
+  if (/\d{2,}/.test(t)) score += 0.3;
+  return { level: Math.max(1, Math.min(8, Math.round(score))), reason: 'rule' };
+}
+
+/* ================================================================
+   5. 存取
+   ================================================================ */
+function save() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify({
+      units: S.units,
+      sent: S.sent,
+      angles: S.angles,
+      events: S.events.slice(-400),
+      dayKey: S.dayKey,
+    }));
+  } catch (e) {}
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    S.events = d.events || [];
+    S.units  = d.units  || new Array(N_GEARS).fill(0);
+    S.sent   = d.sent   || new Array(N_GEARS).fill(0);
+    S.angles = d.angles || new Array(N_GEARS).fill(0);
+
+    for (let i = 0; i < N_GEARS; i++) {
+      if (typeof S.units[i]  !== 'number') S.units[i]  = 0;
+      if (typeof S.sent[i]   !== 'number') S.sent[i]   = 0;
+      if (typeof S.angles[i] !== 'number') S.angles[i] = 0;
+    }
+
+    const now = new Date();
+    const key = dayKeyOf(now);
+    if (d.dayKey && d.dayKey !== key) {
+      S.units[0] = 0;
+      S.sent[0]  = 0;
+      S.angles[0]= 0;
+      smoothOmega[0] = 0;
+    }
+    S.dayKey = key;
+  } catch (e) {}
+}
+
+function dayKeyOf(d) {
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+
+function isToday(t) {
+  const d = new Date(t);
+  const now = new Date();
+  return d.getFullYear() === now.getFullYear() &&
+         d.getMonth()    === now.getMonth()    &&
+         d.getDate()     === now.getDate();
+}
+
+/* ================================================================
+   6. L1 三日清理
+   ================================================================ */
+function purgeOldL1Events() {
+  const cutoff = Date.now() - L1_KEEP_MS;
+  const before = S.events.length;
+  S.events = S.events.filter(e => !(e.level === 1 && e.t < cutoff));
+  const removed = before - S.events.length;
+  if (removed > 0) {
+    save();
+    if (sheetOpen && sheetLevel === 1) renderSheet();
+  }
+  return removed;
+}
+
+/* ================================================================
+   7. 動力傳遞
+   ================================================================ */
+function pushUnits(level, count) {
+  let carry = count;
+  for (let i = level - 1; i < N_GEARS && carry > 0; i++) {
+    S.units[i] += carry;
+    const shouldSend = Math.floor(S.units[i] / RATIO);
+    const extra = shouldSend - S.sent[i];
+    if (extra <= 0) {
+      const g = gears[i];
+      if (g) g.pulse = Math.max(g.pulse, 0.4);
+      break;
+    }
+    S.sent[i] = shouldSend;
+    carry = extra;
+
+    const g = gears[i];
+    if (g) g.pulse = 1;
+    const gu = gears[i + 1];
+    if (gu) gu.pulse = 1;
+
+    if (i + 1 < N_GEARS) {
+      showToast(`L${i+1} 滿 ${RATIO} 件 → L${i+2} 加速！`, 600);
+    }
+  }
+  save();
+  refreshHUD();
+  if (sheetOpen) renderSheet();
+}
+
+function removeUnit(level) {
+  let i = level - 1;
+  if (i < 0 || i >= N_GEARS) return;
+
+  S.units[i] = Math.max(0, S.units[i] - 1);
+
+  while (i < N_GEARS) {
+    const expectedSent = Math.floor(S.units[i] / RATIO);
+    if (S.sent[i] <= expectedSent) break;
+
+    const refund = S.sent[i] - expectedSent;
+    S.sent[i] = expectedSent;
+
+    i++;
+    if (i >= N_GEARS) break;
+    S.units[i] = Math.max(0, S.units[i] - refund);
+  }
+}
+
+function omegaOf(i) {
+  if (i === 0) {
+    const u = S.units[0];
+    if (u <= 0) return 0.08;
+    return Math.min(0.35 + 0.55 * u, 6.5);
+  }
+  const tier = S.units[i];
+  if (tier <= 0) return 0.05;
+  return Math.min(0.1 + 1.9 * tier, 14);
+}
+
+/* ================================================================
+   8. 事件
+   ================================================================ */
+function recordEvent(text, level) {
+  const ev = { id: Date.now() + Math.random(), text, level, t: Date.now() };
+  S.events.push(ev);
+  save();
+  refreshHUD();
+  return ev;
+}
+
+function relevel(ev, newLevel) {
+  if (!ev || ev.level === newLevel) return;
+  ev.level = newLevel;
+  save();
+  if (sheetOpen) renderSheet();
+}
+
+function deleteEvent(id) {
+  if (deletingIds.has(id)) return;
+  const idx = S.events.findIndex(e => e.id === id);
+  if (idx < 0) return;
+  deletingIds.add(id);
+
+  const ev = S.events[idx];
+
+  const row = $sheetList.querySelector(`[data-id="${id}"]`);
+  if (row) row.classList.add('removing');
+
+  setTimeout(() => {
+    const isPastL1 = (ev.level === 1 && !isToday(ev.t));
+    if (!isPastL1) {
+      removeUnit(ev.level);
+      const g = gears.find(g => g.level === ev.level);
+      if (g) g.pulse = 1;
+    }
+
+    const idx2 = S.events.findIndex(e => e.id === id);
+    if (idx2 >= 0) S.events.splice(idx2, 1);
+
+    save();
+    refreshHUD();
+    renderSheet();
+    deletingIds.delete(id);
+
+    showToast('已刪除，動力已回退', 1200);
+  }, 200);
+}
+
+/* ================================================================
+   9. 備份（CSV → Excel 可直接打開）
+   ================================================================ */
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function formatDateTime(t) {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ` +
+         `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+function csvEscape(s) {
+  s = String(s);
+  if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+/** 生成 CSV：按等級從高到低、同級按時間倒序 */
+function buildCsv() {
+  const sorted = [...S.events].sort((a, b) => {
+    if (b.level !== a.level) return b.level - a.level;   // L8 → L1
+    return b.t - a.t;                                     // 新 → 舊
+  });
+
+  const lines = ['事件內容,等級,記錄時間'];
+  for (const e of sorted) {
+    const level = `L${e.level} ${LEVEL_NAMES[e.level - 1]}`;
+    lines.push([
+      csvEscape(e.text),
+      csvEscape(level),
+      csvEscape(formatDateTime(e.t)),
+    ].join(','));
+  }
+  // BOM 讓 Excel 正確識別 UTF-8
+  return '\uFEFF' + lines.join('\r\n');
+}
+
+function backupFileName() {
+  const d = new Date();
+  return `飛輪備份_${d.getFullYear()}${pad2(d.getMonth()+1)}${pad2(d.getDate())}` +
+         `_${pad2(d.getHours())}${pad2(d.getMinutes())}.csv`;
+}
+
+async function backupEvents() {
+  if (S.events.length === 0) {
+    showToast('還沒有事件可以備份', 1600);
+    return;
+  }
+
+  const csv = buildCsv();
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const filename = backupFileName();
+
+  /* ---- 優先：File System Access API，讓用戶自選路徑 ---- */
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{
+          description: 'Excel CSV 檔案',
+          accept: { 'text/csv': ['.csv'] },
+        }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      showToast('✅ 備份完成', 1800);
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;   // 用戶取消
+      // 其他錯誤 → 降級
+    }
+  }
+
+  /* ---- 降級：<a download>，存到瀏覽器預設下載夾 ---- */
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  showToast('✅ 已下載到預設下載夾', 2000);
+}
+
+/* ================================================================
+   10. Canvas
+   ================================================================ */
+const canvas = document.getElementById('scene');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+let gears = [];
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width  = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  computeGears();
+}
+window.addEventListener('resize', resize);
+
+function computeGears() {
+  const baseR = [];
+  for (let i = 0; i < N_GEARS; i++) {
+    baseR.push(9 + 23 * Math.pow(i / (N_GEARS - 1), 1.3));
+  }
+
+  const gap = 16;
+  let totalH = 0;
+  for (let i = 0; i < N_GEARS; i++) {
+    totalH += baseR[i] * 2;
+    if (i < N_GEARS - 1) totalH += gap;
+  }
+
+  const availH = H * 0.56;
+  const scale = Math.min(1, availH / totalH);
+  const radii = baseR.map(r => r * scale);
+  const scaledGap = gap * scale;
+
+  const cx = W / 2;
+  let y = H * 0.16;
+
+  gears = [];
+  for (let i = 0; i < N_GEARS; i++) {
+    y += radii[i];
+    const teeth = Math.max(8, Math.round(2 * Math.PI * radii[i] / 6.5));
+    gears.push({
+      x: cx, y, r: radii[i], teeth,
+      level: i + 1,
+      color: LEVEL_COLORS[i],
+      pulse: 0,
+    });
+    y += radii[i] + scaledGap;
+  }
+}
+
+function gearPath(r, teeth) {
+  const toothH = r * 0.22;
+  const step = Math.PI * 2 / teeth;
+  const rootHalf = step * 0.32;
+  const tipHalf  = step * 0.17;
+  ctx.beginPath();
+  for (let i = 0; i < teeth; i++) {
+    const a = i * step;
+    ctx.arc(0, 0, r + toothH, a - tipHalf, a + tipHalf);
+    ctx.lineTo(r * Math.cos(a + rootHalf), r * Math.sin(a + rootHalf));
+    ctx.arc(0, 0, r, a + rootHalf, a + step - rootHalf);
+  }
+  ctx.closePath();
+}
+
+function draw(dt) {
+  ctx.fillStyle = '#070a10';
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W / 2, cy = H * 0.45;
+  const sp0 = Math.min(smoothOmega[0] / 6.5, 1);
+  const glow = ctx.createRadialGradient(cx, cy, 20, cx, cy, Math.max(W, H) * 0.6);
+  glow.addColorStop(0, `rgba(56,232,255,${0.05 + 0.06 * sp0})`);
+  glow.addColorStop(0.5, `rgba(56,232,255,${0.02 + 0.02 * sp0})`);
+  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < gears.length - 1; i++) {
+    const a = gears[i], b = gears[i + 1];
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y + a.r + 3);
+    ctx.lineTo(b.x, b.y - b.r - 3);
+    ctx.strokeStyle = 'rgba(110,140,190,0.09)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  for (const g of gears) drawGear(g, dt);
+  drawPops(dt);
+}
+
+function drawGear(g, dt) {
+  const i = g.level - 1;
+  const dir = i % 2 === 0 ? 1 : -1;
+  const angle = S.angles[i] * dir;
+  const w = smoothOmega[i];
+  const sf = Math.min(w / 10, 1);
+
+  g.pulse = Math.max(0, g.pulse - dt / 700);
+  const pr = g.r * (1 + g.pulse * 0.1);
+
+  const copies = w > 7 ? 3 : w > 3 ? 2 : 1;
+  const blur = Math.min(w * 0.018, 0.7);
+
+  for (let c = copies - 1; c >= 0; c--) {
+    const off = -(blur * c) / copies * dir;
+    ctx.save();
+    ctx.translate(g.x, g.y);
+    ctx.rotate(angle + off);
+
+    gearPath(pr, g.teeth);
+
+    const grad = ctx.createRadialGradient(0, 0, pr * 0.15, 0, 0, pr);
+    grad.addColorStop(0, `rgba(32,46,66,${0.95 - c * 0.12})`);
+    grad.addColorStop(1, `rgba(11,16,26,${0.98 - c * 0.12})`);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.globalAlpha = c === 0 ? 1 : (1 - c / copies) * 0.35;
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = g.color;
+    ctx.shadowColor = g.color;
+    ctx.shadowBlur = 6 + 22 * sf + g.pulse * 28;
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.beginPath();
+  ctx.arc(g.x, g.y, pr * 0.62, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(7,10,16,0.88)';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = g.color;
+  ctx.globalAlpha = 0.28;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  const num = S.units[i];
+  const numText = num > 999 ? (num / 1000).toFixed(1) + 'k' : String(num);
+  ctx.fillStyle = '#eaf2ff';
+  ctx.font = `200 ${Math.max(11, pr * 0.58)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(numText, g.x, g.y);
+
+  ctx.fillStyle = g.color;
+  ctx.globalAlpha = 0.75;
+  ctx.font = `600 ${Math.max(9, pr * 0.3)}px -apple-system, "PingFang TC", system-ui, sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.fillText(LEVEL_NAMES[i], g.x + pr + 8, g.y);
+  ctx.globalAlpha = 1;
+}
+
+function spawnPop(level, text) {
+  const g = gears.find(g => g.level === level);
+  pops.push({
+    level,
+    text: String(text).length > 12 ? String(text).slice(0, 12) + '…' : String(text),
+    t: 0,
+    x: g ? g.x + g.r + 8 : W / 2,
+    y: g ? g.y : H / 2,
+  });
+}
+
+function drawPops(dt) {
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const p = pops[i];
+    p.t += dt;
+    if (p.t > 1300) { pops.splice(i, 1); continue; }
+    const k = p.t / 1300;
+    const ease = 1 - Math.pow(1 - k, 2);
+    const y = p.y - 6 - 55 * ease;
+    ctx.globalAlpha = (1 - k) * 0.95;
+    ctx.fillStyle = LEVEL_COLORS[p.level - 1];
+    ctx.font = '700 11.5px -apple-system, "PingFang TC", system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.text, p.x, y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ================================================================
+   11. 主循環
+   ================================================================ */
+let last = performance.now();
+let hudAcc = 0;
+
+function loop(now) {
+  const dt = Math.min(now - last, 120);
+  last = now;
+
+  for (let i = 0; i < N_GEARS; i++) {
+    const target = omegaOf(i);
+    smoothOmega[i] += (target - smoothOmega[i]) * Math.min(1, dt / 380);
+    S.angles[i] += smoothOmega[i] * (dt / 1000);
+    if (S.angles[i] > Math.PI * 2) S.angles[i] -= Math.PI * 2;
+  }
+
+  draw(dt);
+
+  hudAcc += dt;
+  if (hudAcc > 200) { hudAcc = 0; refreshHUD(); }
+
+  requestAnimationFrame(loop);
+}
+
+/* ================================================================
+   12. HUD / 時鐘
+   ================================================================ */
+const $rpmVal    = document.getElementById('rpmVal');
+const $todayCount= document.getElementById('todayCount');
+const $clockDate = document.getElementById('clockDate');
+const $clockTime = document.getElementById('clockTime');
+const $empty     = document.getElementById('empty');
+const $toast     = document.getElementById('toast');
+
+function refreshHUD() {
+  const rpm = smoothOmega[0] * 60 / (Math.PI * 2);
+  $rpmVal.textContent = Math.round(rpm);
+  $todayCount.textContent = S.units[0];
+  if (S.events.length > 0) $empty.classList.add('hide');
+  else $empty.classList.remove('hide');
+}
+
+function tickClock() {
+  const now = new Date();
+  const weekdays = ['日','一','二','三','四','五','六'];
+  $clockDate.textContent = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 週${weekdays[now.getDay()]}`;
+  $clockTime.textContent = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+
+  const key = dayKeyOf(now);
+  if (key !== S.dayKey) {
+    S.dayKey = key;
+    S.units[0] = 0;
+    S.sent[0]  = 0;
+    S.angles[0]= 0;
+    smoothOmega[0] = 0;
+    save();
+    refreshHUD();
+
+    const removed = purgeOldL1Events();
+    if (removed > 0) showToast(`🌅 新的一天 · L1 已重置（清理 ${removed} 筆舊記錄）`, 3000);
+    else            showToast('🌅 新的一天，L1 已重置停止', 2600);
+
+    if (sheetOpen) renderSheet();
+  }
+}
+
+function showToast(msg, duration) {
+  const now = Date.now();
+  if (now - lastToastAt < (duration || 800) - 200) return;
+  lastToastAt = now;
+  $toast.textContent = msg;
+  $toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $toast.classList.remove('show'), duration || 1600);
+}
+
+/* ================================================================
+   13. 齒輪點擊
+   ================================================================ */
+function hitTest(x, y) {
+  let best = -1, bestScore = Infinity;
+  for (let i = 0; i < gears.length; i++) {
+    const g = gears[i];
+    const hitR = Math.max(g.r * 1.25 + 10, 18);
+    const d = Math.hypot(x - g.x, y - g.y);
+    if (d <= hitR) {
+      const score = d / hitR;
+      if (score < bestScore) { bestScore = score; best = i; }
+    }
+  }
+  return best;
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (sheetOpen) return;
+  const rect = canvas.getBoundingClientRect();
+  const idx = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+  if (idx >= 0) openSheet(gears[idx].level);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (sheetOpen) { canvas.style.cursor = 'default'; return; }
+  const rect = canvas.getBoundingClientRect();
+  const idx = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+  canvas.style.cursor = idx >= 0 ? 'pointer' : 'default';
+});
+
+/* ================================================================
+   14. 底部面板
+   ================================================================ */
+const $sheet       = document.getElementById('sheet');
+const $backdrop    = document.getElementById('backdrop');
+const $sheetLv     = document.getElementById('sheetLv');
+const $sheetName   = document.getElementById('sheetName');
+const $sheetMeta   = document.getElementById('sheetMeta');
+const $sheetList   = document.getElementById('sheetList');
+const $sheetInput  = document.getElementById('sheetInput');
+const $sheetAddBtn = document.getElementById('sheetAddBtn');
+const $sheetClose  = document.getElementById('sheetClose');
+
+function openSheet(level) {
+  sheetLevel = level;
+  sheetOpen = true;
+
+  $sheetLv.textContent = 'L' + level;
+  $sheetLv.style.background = LEVEL_COLORS[level - 1];
+  $sheetName.textContent = LEVEL_NAMES[level - 1];
+  $sheetInput.placeholder = '加一件 L' + level + ' 的事…';
+
+  renderSheet();
+  $sheet.classList.add('open');
+  $backdrop.classList.add('open');
+
+  const g = gears.find(g => g.level === level);
+  if (g) g.pulse = 1;
+
+  setTimeout(() => { if (sheetOpen) $sheetInput.focus(); }, 320);
+}
+
+function closeSheet() {
+  sheetOpen = false;
+  $sheet.classList.remove('open');
+  $backdrop.classList.remove('open');
+  $sheetInput.blur();
+  canvas.style.cursor = 'default';
+}
+
+function renderSheet() {
+  if (sheetLevel === 1) purgeOldL1Events();
+
+  const list = S.events
+    .filter(e => e.level === sheetLevel)
+    .sort((a, b) => b.t - a.t);
+
+  const u = S.units[sheetLevel - 1];
+  const nextNeed = RATIO - (u % RATIO);
+  let meta = `${list.length} 件事 · 檔位 ${u} · 距升級 ${nextNeed} 件`;
+  if (sheetLevel === 1) meta += ` · 僅保留 ${L1_KEEP_DAYS} 天`;
+  $sheetMeta.textContent = meta;
+
+  if (list.length === 0) {
+    $sheetList.innerHTML = `<div class="ev-empty">${sheetLevel === 1 ? '最近 ' + L1_KEEP_DAYS + ' 天還沒有記錄' : '還沒有人事被歸到這一級'}</div>`;
+    return;
+  }
+
+  $sheetList.innerHTML = list.map(e => `
+    <div class="ev-item" data-id="${e.id}">
+      <div class="ev-text">${escapeHtml(e.text)}</div>
+      <div class="ev-time">${relTime(e.t)}</div>
+      <button class="ev-del" data-id="${e.id}" aria-label="刪除">✕</button>
+    </div>
+  `).join('');
+}
+
+function relTime(t) {
+  const d = (Date.now() - t) / 1000;
+  if (d < 60)   return '剛剛';
+  if (d < 3600) return Math.floor(d / 60) + ' 分鐘前';
+  if (d < 86400) return Math.floor(d / 3600) + ' 小時前';
+
+  const dt = new Date(t);
+  return `${dt.getFullYear()}/${pad2(dt.getMonth()+1)}/${pad2(dt.getDate())}`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function addToSheetLevel() {
+  const text = $sheetInput.value.trim();
+  if (!text) { $sheetInput.focus(); return; }
+  learn(text, sheetLevel);
+  recordEvent(text, sheetLevel);
+  pushUnits(sheetLevel, 1);
+  spawnPop(sheetLevel, text);
+  $sheetInput.value = '';
+  renderSheet();
+  $sheetList.scrollTop = 0;
+}
+
+$sheetList.addEventListener('click', e => {
+  const btn = e.target.closest('.ev-del');
+  if (!btn) return;
+  const id = Number(btn.dataset.id);
+  if (!isNaN(id)) deleteEvent(id);
+});
+
+$sheetAddBtn.addEventListener('click', addToSheetLevel);
+$sheetInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); addToSheetLevel(); }
+});
+$sheetClose.addEventListener('click', closeSheet);
+$backdrop.addEventListener('click', closeSheet);
+
+/* ================================================================
+   15. 主輸入 / 判定卡
+   ================================================================ */
+const $input    = document.getElementById('textInput');
+const $go       = document.getElementById('goBtn');
+const $verdict  = document.getElementById('verdict');
+const $vLv      = document.getElementById('vLv');
+const $vName    = document.getElementById('vName');
+const $vTag     = document.getElementById('vTag');
+const $vText    = document.getElementById('vText');
+const $vNote    = document.getElementById('vNote');
+const $vActions = document.getElementById('vActions');
+const $tsBtn    = document.getElementById('tsBtn');
+const $backupBtn= document.getElementById('backupBtn');
+
+for (let i = 1; i <= 8; i++) {
+  const b = document.createElement('button');
+  b.dataset.l = i;
+  b.textContent = 'L' + i;
+  b.style.color = LEVEL_COLORS[i - 1];
+  b.addEventListener('click', () => {
+    if (!currentVerdict) return;
+    const lv = i;
+    relevel(currentVerdict, lv);
+    learn(currentVerdict.text, lv);
+
+    $vLv.textContent = 'L' + lv;
+    $vLv.style.background = LEVEL_COLORS[lv - 1];
+    $vName.textContent = LEVEL_NAMES[lv - 1];
+    $vTag.textContent = '✓ 已記住';
+    updateVNote(lv);
+
+    $vActions.querySelectorAll('button').forEach(x => {
+      x.classList.toggle('on', +x.dataset.l === lv);
+    });
+
+    clearTimeout(verdictTimer);
+    verdictTimer = setTimeout(() => { $verdict.style.display = 'none'; }, 2200);
+  });
+  $vActions.appendChild(b);
+}
+
+function updateVNote(level) {
+  const u = S.units[level - 1];
+  const next = RATIO - (u % RATIO);
+  $vNote.innerHTML = `動力注入 <b>L1</b> · 記錄在 L${level} · 該級距升級還差 <b>${next}</b> 件`;
+}
+
+function submit() {
+  const text = $input.value.trim();
+  if (!text) { $input.focus(); return; }
+
+  const res = classify(text);
+  const ev = recordEvent(text, res.level);
+
+  pushUnits(1, 1);
+  spawnPop(1, text);
+
+  $input.value = '';
+  showVerdict(ev, res);
+}
+
+$go.addEventListener('click', submit);
+$input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') submit();
+});
+
+function showVerdict(ev, res) {
+  currentVerdict = ev;
+  const lv = ev.level;
+
+  $vLv.textContent = 'L' + lv;
+  $vLv.style.background = LEVEL_COLORS[lv - 1];
+  $vName.textContent = LEVEL_NAMES[lv - 1];
+  $vText.textContent = ev.text;
+
+  $vTag.textContent = (res && res.reason === 'learned') ? '依你的習慣' : '';
+
+  updateVNote(lv);
+
+  $vActions.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', +b.dataset.l === lv);
+  });
+
+  $verdict.style.display = 'block';
+  $verdict.style.animation = 'none';
+  void $verdict.offsetWidth;
+  $verdict.style.animation = '';
+
+  clearTimeout(verdictTimer);
+  verdictTimer = setTimeout(() => { $verdict.style.display = 'none'; }, 4200);
+}
+
+/* ================================================================
+   16. 備份按鈕 / 時間加速
+   ================================================================ */
+$backupBtn.addEventListener('click', async () => {
+  $backupBtn.disabled = true;
+  try {
+    await backupEvents();
+  } finally {
+    $backupBtn.disabled = false;
+  }
+});
+
+const SCALES = [1, 60, 300];
+let scaleIdx = 0;
+$tsBtn.addEventListener('click', () => {
+  scaleIdx = (scaleIdx + 1) % SCALES.length;
+  // timeScale 不影響真實時鐘，只保留給舊版相容，這裡仍維持按鈕可視反饋
+  $tsBtn.textContent = '×' + SCALES[scaleIdx];
+});
+
+/* ================================================================
+   17. 啟動
+   ================================================================ */
+loadLearned();
+load();
+purgeOldL1Events();
+resize();
+tickClock();
+setInterval(tickClock, 250);
+refreshHUD();
+requestAnimationFrame(t => { last = t; loop(t); });
+
+if (S.events.length === 0) {
+  setTimeout(() => {
+    $empty.textContent = '試試寫「回了一封信」或「發佈新版本」';
+  }, 2500);
+}
+
+})();
+</script>
+</body>
+</html>
